@@ -1,0 +1,2 @@
+# fc15a9ee-180f-4836-8836-106fcd7b64f8-5f77cb93-d9df-40a2-9c35-52329b2861bd
+https://sonar.server.examly.io/dashboard?id=iamneo-production_fc15a9ee-180f-4836-8836-106fcd7b64f8-5f77cb93-d9df-40a2-9c35-52329b2861bd&amp;codeScope=overall
