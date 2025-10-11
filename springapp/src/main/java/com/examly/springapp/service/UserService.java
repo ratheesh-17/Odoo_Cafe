@@ -205,4 +205,28 @@ public class UserService implements UserDetailsService {
         log.info("User role updated successfully: {} -> {}", userEmail, newRole);
         return user;
     }
+    
+    // Admin-specific methods
+    public User getUserById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with ID: " + id));
+    }
+    
+    @Transactional
+    public User updateUserStatus(Long id, boolean enabled) {
+        User user = getUserById(id);
+        user.setEnabled(enabled);
+        user = userRepository.save(user);
+        log.info("User status updated: {} -> enabled: {}", user.getEmail(), enabled);
+        return user;
+    }
+    
+    @Transactional
+    public User updateUserRole(Long id, User.Role newRole) {
+        User user = getUserById(id);
+        user.setRole(newRole);
+        user = userRepository.save(user);
+        log.info("User role updated: {} -> {}", user.getEmail(), newRole);
+        return user;
+    }
 }

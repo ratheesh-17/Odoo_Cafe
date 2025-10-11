@@ -1,24 +1,15 @@
 import React, { useState, useCallback, useEffect } from "react";
-import Header from "./components/Header";
 import { SongProvider, useSongs } from "./context/SongContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import AuthPage from "./components/AuthPage";
 import UserProfile from "./components/UserProfile";
-import SongManager from "./components/SongManager";
-import SongFormImproved from "./components/SongFormImproved";
 import SongListImproved from "./components/SongListImproved";
 import Pagination from "./components/Pagination";
 import JioSaavnExplorer from './components/JioSaavnExplorer';
 import ArtistSongUpload from './components/ArtistSongUpload';
+import AdminDashboard from './components/AdminDashboard';
+import './components/AdminDashboard.css';
 import { 
-  useSongForm, 
-  useFilters, 
-  useSongOperations, 
-  usePagination 
-} from "./hooks/useSongHooks";
-import { 
-  applySongFilters, 
-  applySongSort, 
   getUniqueValues,
   getDurationStats,
   formatDuration,
@@ -26,16 +17,11 @@ import {
   debounce
 } from "./utils/filtering";
 import { 
-  calculatePagination, 
-  generatePageNumbers, 
-  formatPaginationText, 
-  getItemsPerPageOptions 
+  generatePageNumbers
 } from "./utils/pagination";
 import { 
-  FILTER_OPTIONS, 
   SORT_OPTIONS, 
   UI_MESSAGES, 
-  PAGINATION_CONFIG,
   SEARCH_CONFIG 
 } from "./constants";
 import "./App.css";
@@ -58,6 +44,16 @@ function ModernNavbar({ viewMode, setViewMode, showAdvancedFeatures, setShowAdva
       premium: user?.role !== 'PREMIUM_USER' && user?.role !== 'ARTIST' && user?.role !== 'ADMIN'
     },
   ];
+  
+  // Add admin dashboard for admin users
+  if (user?.role === 'ADMIN') {
+    baseNavItems.push({
+      id: 'admin',
+      label: 'Admin Dashboard',
+      icon: '🛠️',
+      color: '#8b5cf6'
+    });
+  }
   
   const navItems = user?.role === 'ARTIST' 
     ? [...baseNavItems, { id: 'upload', label: 'Upload Song', icon: '🎤', color: '#f59e0b' }]
@@ -352,38 +348,20 @@ function AppContent() {
     error,
     message,
     currentPage,
-    itemsPerPage,
     totalItems,
     paginationData,
-    sortOrder,
-    searchQuery,
     activeFilters,
-    filter,
     // Core functions
     fetchSongs,
     addNewSong,
-    removeSong,
-    setFilter,
     clearMessage,
     // Pagination functions
-    setCurrentPage,
-    setItemsPerPage,
-    goToNextPage,
-    goToPreviousPage,
     goToFirstPage,
     goToLastPage,
     // Filtering and sorting functions
-    setSortOrder,
-    setSearchQuery,
     applyFilters,
     clearAllFilters,
   } = useSongs();
-  
-  // Hook-based functions
-  const songForm = useSongForm();
-  const filters = useFilters();
-  const operations = useSongOperations();
-  const pagination = usePagination();
   
   // Utility function demonstrations
   const handleBulkOperations = useCallback(() => {
@@ -503,6 +481,12 @@ function AppContent() {
       {viewMode === 'upload' && (
         <div className="upload-view">
           <ArtistSongUpload onSongAdded={() => fetchSongs('all')} />
+        </div>
+      )}
+      
+      {viewMode === 'admin' && user?.role === 'ADMIN' && (
+        <div className="admin-view">
+          <AdminDashboard />
         </div>
       )}
       
