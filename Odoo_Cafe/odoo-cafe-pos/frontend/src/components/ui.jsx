@@ -81,6 +81,30 @@ export function ConfirmDialog({ open, title, message, onConfirm, onCancel, dange
   )
 }
 
+export function Toggle({ enabled, onChange, disabled = false }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!enabled)}
+      className={clsx(
+        'relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none',
+        enabled ? 'bg-primary-500' : 'bg-white/20',
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+      )}
+    >
+      <span
+        className={clsx(
+          'pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200',
+          enabled ? 'translate-x-5' : 'translate-x-0',
+        )}
+      />
+    </button>
+  )
+}
+
 export function StatCard({ label, value, sub, icon: Icon, color = 'primary' }) {
   const colors = {
     primary: 'bg-primary-500/15 text-primary-400',

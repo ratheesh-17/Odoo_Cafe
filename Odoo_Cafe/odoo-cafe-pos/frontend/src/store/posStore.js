@@ -92,4 +92,12 @@ export const usePosStore = create((set, get) => ({
   },
 
   clearOrder: () => set({ activeOrder: null, activeTable: null }),
+
+  linkCustomer: async (customerId) => {
+    const { activeOrder } = get()
+    if (!activeOrder) return
+    const { data } = await api.put(`/orders/${activeOrder.id}`, { customer_id: customerId })
+    set({ activeOrder: data })
+    return data
+  },
 }))
