@@ -48,6 +48,7 @@ class MenuProductResponse(BaseModel):
     description: str | None
     unit_of_measure: str
     tax_percent: float
+    category_id: int
     category: MenuCategoryResponse
 
     model_config = {"from_attributes": True}
@@ -57,6 +58,7 @@ class TableInfoResponse(BaseModel):
     id: int
     table_number: str
     seats: int
+    floor_name: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -118,6 +120,7 @@ class CustomerDisplayResponse(BaseModel):
     order_id: int
     order_number: str
     status: str                  # draft | sent_to_kitchen | paid | cancelled
+    table_number: str | None     # populated when order has a table
     items: list[DisplayOrderItem]
     subtotal: float
     tax_amount: float

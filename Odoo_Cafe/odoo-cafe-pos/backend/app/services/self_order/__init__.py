@@ -104,7 +104,12 @@ def get_menu(token: str, db: Session) -> MenuResponse:
     )
 
     return MenuResponse(
-        table=TableInfoResponse.model_validate(table),
+        table=TableInfoResponse(
+            id=table.id,
+            table_number=table.table_number,
+            seats=table.seats,
+            floor_name=table.floor.name if table.floor else None,
+        ),
         config=SelfOrderConfigResponse.model_validate(config),
         categories=[MenuCategoryResponse.model_validate(c) for c in categories],
         products=[MenuProductResponse.model_validate(p) for p in products],
@@ -223,9 +228,14 @@ def apply_coupon(token: str, order_id: int, payload: SelfCouponApply, db: Sessio
 
 
 def submit_order(token: str, order_id: int, db: Session) -> OrderResponse:
-    """Customer submits cart — auto sends to kitchen."""
-    _resolve_order(token, order_id, db)
-    return order_service.send_to_kitchen(order_id, db)
+    """Customer submits cart — stays as draft until staff confirms or sends to kitchen."""
+    order = _resolve_order(token, order_id, db)
+    if order.status != OrderStatus.draft:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only draft orders can be submitted by the customer",
+        )
+    return order_service._to_response(order_service._get_order(order_id, db))
 
 
 # ── Customer order status tracking ───────────────────────────────────────────
@@ -258,6 +268,7 @@ def get_customer_display(order_id: int, db: Session) -> CustomerDisplayResponse:
         order_id=order.id,
         order_number=order.order_number,
         status=order.status.value,
+        table_number=order.table.table_number if order.table else None,
         items=[
             DisplayOrderItem(
                 product_name=item.product.name,

@@ -11,12 +11,12 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
 
 
 @router.get("", response_model=list[CategoryResponse])
-def list_categories(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def list_categories(db: Session = Depends(get_db)):
     return category_service.get_all(db)
 
 
 @router.get("/{category_id}", response_model=CategoryResponse)
-def get_category(category_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def get_category(category_id: int, db: Session = Depends(get_db)):
     return category_service.get_by_id(category_id, db)
 
 

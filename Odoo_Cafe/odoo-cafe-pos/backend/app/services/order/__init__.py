@@ -16,7 +16,7 @@ from app.models.user import User
 from app.schemas.order import (
     OrderCreate, OrderUpdate, CartItemAdd, CartItemUpdate,
     CouponApply, PaymentCreate, OrderResponse, PaymentResponse,
-    OrderItemResponse, ProductBrief, CustomerBrief, TableBrief,
+    OrderItemResponse, ProductBrief, CategoryBrief, CustomerBrief, TableBrief,
     EmployeeBrief, CouponBrief, PromotionBrief,
 )
 import app.services.promotion as promotion_service
@@ -39,13 +39,14 @@ def _get_order(order_id: int, db: Session) -> Order:
     order = (
         db.query(Order)
         .options(
-            joinedload(Order.items).joinedload(OrderItem.product),
+            joinedload(Order.items).joinedload(OrderItem.product).joinedload(Product.category),
             joinedload(Order.table),
             joinedload(Order.customer),
             joinedload(Order.employee),
             joinedload(Order.coupon),
             joinedload(Order.promotion),
             joinedload(Order.payment).joinedload(Payment.payment_method),
+            joinedload(Order.kitchen_ticket).joinedload(KitchenTicket.ticket_items),
         )
         .filter(Order.id == order_id)
         .first()
@@ -156,7 +157,16 @@ def _to_response(order: Order) -> OrderResponse:
         items=[
             OrderItemResponse(
                 id=item.id,
-                product=ProductBrief.model_validate(item.product),
+                product=ProductBrief(
+                    id=item.product.id,
+                    name=item.product.name,
+                    category_id=item.product.category_id,
+                    category=CategoryBrief(
+                        id=item.product.category.id,
+                        name=item.product.category.name,
+                        color=item.product.category.color,
+                    ) if item.product.category else None,
+                ),
                 quantity=item.quantity,
                 unit_price=float(item.unit_price),
                 tax_percent=float(item.tax_percent),
@@ -188,7 +198,7 @@ def get_all(db: Session, session_id: int | None = None, status_filter: OrderStat
     query = (
         db.query(Order)
         .options(
-            joinedload(Order.items).joinedload(OrderItem.product),
+            joinedload(Order.items).joinedload(OrderItem.product).joinedload(Product.category),
             joinedload(Order.table),
             joinedload(Order.customer),
             joinedload(Order.employee),
@@ -196,7 +206,6 @@ def get_all(db: Session, session_id: int | None = None, status_filter: OrderStat
             joinedload(Order.promotion),
             joinedload(Order.payment).joinedload(Payment.payment_method),
         )
-        .outerjoin(Order.customer)
     )
     if session_id:
         query = query.filter(Order.session_id == session_id)
@@ -204,7 +213,7 @@ def get_all(db: Session, session_id: int | None = None, status_filter: OrderStat
         query = query.filter(Order.status == status_filter)
     if search:
         term = f"%{search.strip()}%"
-        query = query.filter(or_(
+        query = query.outerjoin(Order.customer).filter(or_(
             Order.order_number.ilike(term),
             Customer.name.ilike(term),
             cast(Order.created_at, SAString).ilike(term),
@@ -251,6 +260,11 @@ def cancel(order_id: int, db: Session) -> OrderResponse:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Paid orders cannot be cancelled",
+        )
+    if order.status == OrderStatus.sent_to_kitchen:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Orders sent to kitchen cannot be cancelled. Cancel from the kitchen display system.",
         )
     if order.status == OrderStatus.cancelled:
         raise HTTPException(
@@ -387,7 +401,7 @@ def remove_coupon(order_id: int, db: Session) -> OrderResponse:
 def send_to_kitchen(order_id: int, db: Session) -> OrderResponse:
     order = _get_order(order_id, db)
 
-    if order.status not in (OrderStatus.draft, OrderStatus.sent_to_kitchen):
+    if order.status not in (OrderStatus.draft, OrderStatus.sent_to_kitchen, OrderStatus.paid):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot send order with status '{order.status}' to kitchen",
@@ -406,7 +420,6 @@ def send_to_kitchen(order_id: int, db: Session) -> OrderResponse:
         )
 
     if order.kitchen_ticket:
-        # already has a ticket — add only new items not yet in KDS
         existing_item_ids = {kti.order_item_id for kti in order.kitchen_ticket.ticket_items}
         for item in kds_items:
             if item.id not in existing_item_ids:
@@ -424,7 +437,9 @@ def send_to_kitchen(order_id: int, db: Session) -> OrderResponse:
                 order_item_id=item.id,
             ))
 
-    order.status = OrderStatus.sent_to_kitchen
+    if order.status == OrderStatus.draft:
+        order.status = OrderStatus.sent_to_kitchen
+
     db.commit()
     return _to_response(_get_order(order_id, db))
 

@@ -13,18 +13,8 @@ router = APIRouter(prefix="/payment-methods", tags=["Payment Methods"])
 
 
 @router.get("", response_model=list[PaymentMethodResponse])
-def list_payment_methods(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+def list_payment_methods(db: Session = Depends(get_db), _: User = Depends(require_employee)):
     return payment_method_service.get_all(db)
-
-
-@router.put("/{payment_type}", response_model=PaymentMethodResponse)
-def update_payment_method(
-    payment_type: PaymentType,
-    payload: PaymentMethodUpdate,
-    db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
-):
-    return payment_method_service.update(payment_type, payload, db)
 
 
 @router.get("/upi/qr")
@@ -43,3 +33,13 @@ def get_upi_qr(
         raise HTTPException(status_code=400, detail="UPI ID is not configured")
     qr_b64 = generate_upi_qr(method.upi_id, amount)
     return {"upi_id": method.upi_id, "amount": amount, "qr_base64": qr_b64}
+
+
+@router.put("/{payment_type}", response_model=PaymentMethodResponse)
+def update_payment_method(
+    payment_type: PaymentType,
+    payload: PaymentMethodUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return payment_method_service.update(payment_type, payload, db)

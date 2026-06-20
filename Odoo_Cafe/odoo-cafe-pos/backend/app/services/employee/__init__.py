@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User, UserRole
 from app.schemas.employee import UserCreate, UserUpdate, ChangePasswordRequest
-from app.utils.password_hash import hash_password
+from app.utils.password_hash import hash_password, verify_password
 
 
 def get_all(db: Session) -> list[User]:
@@ -63,6 +63,21 @@ def update(user_id: int, payload: UserUpdate, db: Session, current_user: User) -
 
 def change_password(user_id: int, payload: ChangePasswordRequest, db: Session) -> User:
     user = get_by_id(user_id, db)
+    
+    # Verify old password
+    if not verify_password(payload.old_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Prevent using same password
+    if verify_password(payload.new_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password"
+        )
+    
     user.password_hash = hash_password(payload.new_password)
     db.commit()
     db.refresh(user)

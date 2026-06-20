@@ -23,7 +23,7 @@ def signup(payload: SignupRequest, db: Session) -> TokenResponse:
     db.add(user)
     db.commit()
     db.refresh(user)
-    token = create_access_token({"sub": user.id, "role": user.role})
+    token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return TokenResponse(access_token=token)
 
 
@@ -39,5 +39,5 @@ def login(payload: LoginRequest, db: Session) -> TokenResponse:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This account has been archived",
         )
-    token = create_access_token({"sub": user.id, "role": user.role})
+    token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return TokenResponse(access_token=token)

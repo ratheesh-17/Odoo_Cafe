@@ -73,10 +73,19 @@ class PaymentCreate(BaseModel):
 
 # ── Nested response pieces ────────────────────────────────────────────────────
 
+class CategoryBrief(BaseModel):
+    id: int
+    name: str
+    color: str
+
+    model_config = {"from_attributes": True}
+
+
 class ProductBrief(BaseModel):
     id: int
     name: str
     category_id: int
+    category: CategoryBrief | None = None
 
     model_config = {"from_attributes": True}
 

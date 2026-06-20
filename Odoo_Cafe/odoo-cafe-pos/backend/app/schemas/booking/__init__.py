@@ -29,7 +29,8 @@ class BookingCreate(BaseModel):
     @field_validator("scheduled_at")
     @classmethod
     def not_in_past(cls, v: datetime) -> datetime:
-        if v < datetime.now():
+        now = datetime.now(v.tzinfo) if v.tzinfo else datetime.now()
+        if v < now:
             raise ValueError("Booking time cannot be in the past")
         return v
 

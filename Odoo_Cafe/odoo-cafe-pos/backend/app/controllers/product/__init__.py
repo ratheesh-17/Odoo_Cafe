@@ -16,7 +16,6 @@ def list_products(
     search: str | None = Query(None),
     include_archived: bool = Query(False, description="Include inactive/archived products"),
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
 ):
     return product_service.get_all(db, category_id=category_id, search=search, include_archived=include_archived)
 

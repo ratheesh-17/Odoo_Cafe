@@ -25,6 +25,7 @@ class Product(Base):
     unit_of_measure: Mapped[UnitOfMeasure] = mapped_column(Enum(UnitOfMeasure), nullable=False, default=UnitOfMeasure.piece)
     tax_percent: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, default=0.00)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     show_in_kds: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())

@@ -11,6 +11,7 @@ class ProductCreate(BaseModel):
     unit_of_measure: UnitOfMeasure = UnitOfMeasure.piece
     tax_percent: float = 0.00
     description: str | None = None
+    image_url: str | None = None
     show_in_kds: bool = True
 
     @field_validator("name")
@@ -42,6 +43,7 @@ class ProductUpdate(BaseModel):
     unit_of_measure: UnitOfMeasure | None = None
     tax_percent: float | None = None
     description: str | None = None
+    image_url: str | None = None
     show_in_kds: bool | None = None
     is_active: bool | None = None
 
@@ -68,6 +70,7 @@ class ProductResponse(BaseModel):
     unit_of_measure: UnitOfMeasure
     tax_percent: float
     description: str | None
+    image_url: str | None
     show_in_kds: bool
     is_active: bool
     created_at: datetime

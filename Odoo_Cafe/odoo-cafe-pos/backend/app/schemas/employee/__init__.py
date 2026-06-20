@@ -38,6 +38,7 @@ class UserUpdate(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
+    old_password: str
     new_password: str
 
     @field_validator("new_password")

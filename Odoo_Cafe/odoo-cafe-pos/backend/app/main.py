@@ -36,8 +36,22 @@ import app.models  # noqa: F401 — registers all models with Base.metadata
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    # Apply any column additions that create_all won't add to existing tables
+    _run_migrations()
     run_seed()
     yield
+
+
+def _run_migrations():
+    """Safely add new columns to existing tables if they don't exist yet."""
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        # Add image_url to products if missing
+        try:
+            conn.execute(text("ALTER TABLE products ADD COLUMN image_url VARCHAR(500)"))
+            conn.commit()
+        except Exception:
+            pass  # column already exists
 
 
 app = FastAPI(
@@ -50,7 +64,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
