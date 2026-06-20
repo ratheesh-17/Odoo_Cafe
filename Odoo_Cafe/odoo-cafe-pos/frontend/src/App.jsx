@@ -12,8 +12,7 @@ import ProductsPage         from './pages/backend/ProductsPage'
 import CategoriesPage       from './pages/backend/CategoriesPage'
 import PaymentMethodsPage   from './pages/backend/PaymentMethodsPage'
 import FloorsPage           from './pages/backend/FloorsPage'
-import CouponsPage          from './pages/backend/CouponsPage'
-import PromotionsPage       from './pages/backend/PromotionsPage'
+import CouponPromotionPage  from './pages/backend/CouponPromotionPage'
 import EmployeesPage        from './pages/backend/EmployeesPage'
 import BookingsPage         from './pages/backend/BookingsPage'
 import SessionPage          from './pages/backend/SessionPage'
@@ -21,8 +20,12 @@ import SelfOrderConfigPage  from './pages/backend/SelfOrderConfigPage'
 import ReportsPage          from './pages/backend/ReportsPage'
 
 import PosTerminal     from './pages/pos/PosTerminal'
-import OrdersListPage  from './pages/pos/OrdersListPage'
-import KitchenPage     from './pages/kitchen/KitchenPage'
+import OrderViewPage   from './pages/pos/OrderViewPage'
+import OrdersPage      from './pages/pos/OrdersPage'
+import CustomerPage    from './pages/pos/CustomerPage'
+import KitchenPage         from './pages/kitchen/KitchenPage'
+import SelfOrderPage       from './pages/SelfOrderPage'
+import CustomerDisplayPage from './pages/CustomerDisplayPage'
 
 function RequireAuth({ children, role }) {
   const { token, user } = useAuthStore()
@@ -56,20 +59,24 @@ export default function App() {
         <Route path="categories"  element={<CategoriesPage />} />
         <Route path="payments"    element={<PaymentMethodsPage />} />
         <Route path="floors"      element={<FloorsPage />} />
-        <Route path="coupons"     element={<CouponsPage />} />
-        <Route path="promotions"  element={<PromotionsPage />} />
-        <Route path="employees"   element={<EmployeesPage />} />
+        <Route path="coupons"     element={<CouponPromotionPage />} />
+        <Route path="promotions"  element={<CouponPromotionPage />} />
+        <Route path="employees"   element={<RequireAuth role="admin"><EmployeesPage /></RequireAuth>} />
         <Route path="bookings"    element={<BookingsPage />} />
         <Route path="self-order"  element={<SelfOrderConfigPage />} />
         <Route path="reports"     element={<ReportsPage />} />
       </Route>
 
       <Route path="/pos" element={<RequireAuth><PosLayout /></RequireAuth>}>
-        <Route index          element={<PosTerminal />} />
-        <Route path="orders"  element={<OrdersListPage />} />
+        <Route index            element={<PosTerminal />} />
+        <Route path="order"     element={<OrderViewPage />} />
+        <Route path="orders"    element={<OrdersPage />} />
+        <Route path="customers" element={<CustomerPage />} />
       </Route>
 
-      <Route path="/kitchen" element={<KitchenPage />} />
+      <Route path="/kitchen"           element={<KitchenPage />} />
+      <Route path="/s/:token"           element={<SelfOrderPage />} />
+      <Route path="/customer-display"   element={<CustomerDisplayPage />} />
 
       <Route path="/" element={<Navigate to="/backend" replace />} />
       <Route path="*" element={<Navigate to="/backend" replace />} />
