@@ -95,6 +95,7 @@ export default function OrdersListPage() {
             <tr>
               <th>Order #</th>
               <th>Date</th>
+              <th>Employee</th>
               <th>Customer</th>
               <th>Table</th>
               <th>Amount</th>
@@ -106,6 +107,7 @@ export default function OrdersListPage() {
               <tr key={o.id} onClick={() => setSelected(o)} style={{ cursor: "pointer" }}>
                 <td><code>{o.order_number}</code></td>
                 <td>{new Date(o.created_at).toLocaleString()}</td>
+                <td>{o.employee?.name ?? "—"}</td>
                 <td>{o.customer?.name ?? "—"}</td>
                 <td>{o.table?.table_number ?? "Takeaway"}</td>
                 <td>{fmt(o.total_amount)}</td>
@@ -135,6 +137,7 @@ export default function OrdersListPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem", fontSize: "0.9rem" }}>
               <div><strong>Date:</strong> {new Date(selected.created_at).toLocaleString()}</div>
               <div><strong>Status:</strong> <span className={`badge ${STATUS_COLOR[selected.status] ?? "badge-gray"}`}>{selected.status?.replace("_", " ")}</span></div>
+              <div><strong>Employee:</strong> {selected.employee?.name ?? "—"}</div>
               <div><strong>Customer:</strong> {selected.customer?.name ?? "—"}</div>
               <div><strong>Table:</strong> {selected.table?.table_number ?? "Takeaway"}</div>
             </div>

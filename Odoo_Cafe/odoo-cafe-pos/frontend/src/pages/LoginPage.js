@@ -50,11 +50,9 @@ export default function LoginPage() {
       <section className="auth-left-panel auth-login-panel">
         <div className="auth-deco-card auth-deco-card--light">
           <div className="auth-hero-title">Welcome back to Odoo Cafe</div>
-          <p className="auth-hero-copy">Sign in to manage bookings, orders, staff, and cafe operations with a clean dashboard experience.</p>
           <div className="auth-hero-features">
-            <div>• Live POS and kitchen tracking</div>
-            <div>• Table booking and QR self-order</div>
-            <div>• Reports, receipts, and customer management</div>
+            <div>“Fast service, clear control.”</div>
+            <div>“QR ordering to kitchen flow in seconds.”</div>
           </div>
           <div className="auth-image-card">
             <img

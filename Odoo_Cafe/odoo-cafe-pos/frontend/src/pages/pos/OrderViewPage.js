@@ -128,30 +128,74 @@ export default function OrderViewPage() {
   };
 
   const applyCoupon = async () => {
-    if (!couponCode.trim()) return;
-    try { const { data } = await api.post(`/orders/${order.id}/coupon`, { code: couponCode.trim().toUpperCase() }); setOrder(data); setCouponCode(""); setShowCoupon(false); toast.success("Coupon applied!"); }
-    catch {}
+    if (!order) return toast.error("Order is unavailable");
+    if (!couponCode.trim()) return toast.error("Enter a coupon code");
+    try {
+      const { data } = await api.post(`/orders/${order.id}/coupon`, { code: couponCode.trim().toUpperCase() });
+      setOrder(data);
+      setCouponCode("");
+      setShowCoupon(false);
+      toast.success("Coupon applied!");
+    } catch (err) {
+      const message = err?.response?.data?.detail || err?.message || "Unable to apply coupon";
+      toast.error(message);
+    }
   };
 
   const removeCoupon = async () => {
-    try { const { data } = await api.delete(`/orders/${order.id}/coupon`); setOrder(data); }
-    catch {}
+    if (!order) return toast.error("Order is unavailable");
+    try {
+      const { data } = await api.delete(`/orders/${order.id}/coupon`);
+      setOrder(data);
+      toast.success("Coupon removed");
+    } catch (err) {
+      const message = err?.response?.data?.detail || err?.message || "Unable to remove coupon";
+      toast.error(message);
+    }
   };
 
   const sendToKitchen = async () => {
-    try { const { data } = await api.post(`/orders/${order.id}/send-to-kitchen`); setOrder(data); toast.success("Sent to kitchen!"); }
-    catch {}
+    if (!order) return toast.error("Order is unavailable");
+    try {
+      const { data } = await api.post(`/orders/${order.id}/send-to-kitchen`);
+      setOrder(data);
+      toast.success("Sent to kitchen!");
+    } catch (err) {
+      const message = err?.response?.data?.detail || err?.message || "Unable to send order to kitchen";
+      toast.error(message);
+    }
   };
 
   const openPayment = async () => {
-    const methods = await api.get("/payment-methods").then(r => r.data.filter(m => m.is_enabled));
-    setPayMethods(methods);
-    setPayType(methods[0]?.type ?? "cash");
-    setAmountPaid("");
-    setTxRef("");
-    setUpiQr(null);
-    setShowPayment(true);
+    if (!order) return toast.error("Order is unavailable");
+    try {
+      const methods = await api.get("/payment-methods").then(r => r.data.filter(m => m.is_enabled));
+      if (!methods.length) {
+        toast.error("No payment methods are available. Check backend settings.");
+        return;
+      }
+      setPayMethods(methods);
+      const defaultType = methods[0]?.type ?? "cash";
+      setPayType(defaultType);
+      setAmountPaid(defaultType === "cash" ? String(order.total_amount ?? "") : "");
+      setTxRef("");
+      setUpiQr(null);
+      setShowPayment(true);
+    } catch (err) {
+      const message = err?.response?.data?.detail || err?.message || "Unable to load payment methods";
+      toast.error(message);
+    }
   };
+
+  useEffect(() => {
+    if (!showPayment) return;
+    if (payType === "cash") {
+      setAmountPaid(String(order?.total_amount ?? ""));
+    }
+    if (payType !== "card") {
+      setTxRef("");
+    }
+  }, [payType, showPayment, order?.total_amount]);
 
   useEffect(() => {
     if (payType === "upi" && order && showPayment) {
@@ -160,17 +204,33 @@ export default function OrderViewPage() {
   }, [payType, showPayment, order]);
 
   const processPayment = async () => {
-    const total = parseFloat(order.total_amount);
-    const paid = payType === "cash" ? parseFloat(amountPaid) : total;
-    if (payType === "cash" && paid < total) return toast.error(`Need at least ${fmt(total)}`);
+    if (!order) return toast.error("Order is unavailable");
+    const total = parseFloat(order.total_amount ?? 0);
+    if (!Number.isFinite(total) || total < 0) return toast.error("Invalid order total");
+
+    let paid = total;
+    if (payType === "cash") {
+      paid = parseFloat(amountPaid);
+      if (Number.isNaN(paid)) return toast.error("Enter a valid cash amount");
+      if (paid < total) return toast.error(`Need at least ${fmt(total)}`);
+    }
     if (payType === "card" && !txRef.trim()) return toast.error("Transaction reference required");
+
     setPaying(true);
     try {
-      const { data } = await api.post(`/orders/${order.id}/payment`, { payment_type: payType, amount_paid: paid, transaction_ref: payType === "card" ? txRef.trim() : null });
+      const { data } = await api.post(`/orders/${order.id}/payment`, {
+        payment_type: payType,
+        amount_paid: paid,
+        transaction_ref: payType === "card" ? txRef.trim() : null,
+      });
+      setOrder(data);
       setPaidOrder(data);
       setShowPayment(false);
       toast.success("Payment complete!");
-    } catch {} finally { setPaying(false); }
+    } catch (err) {
+      const message = err?.response?.data?.detail || err?.message || "Payment failed";
+      toast.error(message);
+    } finally { setPaying(false); }
   };
 
   const sendReceipt = async (email) => {

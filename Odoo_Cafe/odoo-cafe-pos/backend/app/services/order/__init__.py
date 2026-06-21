@@ -95,12 +95,15 @@ def _recalculate(order: Order, db: Session) -> None:
     Also re-evaluates order-level promotion.
     Coupon discount is preserved if already applied.
     """
-    subtotal = sum(float(item.unit_price) * item.quantity for item in order.items)
-    tax_amount = sum(
-        round(float(item.unit_price) * item.quantity * float(item.tax_percent) / 100, 2)
-        for item in order.items
+    subtotal = round(sum(float(item.unit_price) * item.quantity for item in order.items), 2)
+    tax_amount = round(
+        sum(
+            round(float(item.unit_price) * item.quantity * float(item.tax_percent) / 100, 2)
+            for item in order.items
+        ),
+        2,
     )
-    product_discounts = sum(float(item.line_discount) for item in order.items)
+    product_discounts = round(sum(float(item.line_discount) for item in order.items), 2)
 
     # re-evaluate order-level promotion
     order_promo = promotion_service.evaluate_order_promotion(subtotal, db)
@@ -114,7 +117,6 @@ def _recalculate(order: Order, db: Session) -> None:
         order.promotion_id = None
         promo_discount = 0.0
 
-    # coupon discount (flat on top — only if still valid)
     coupon_discount = 0.0
     if order.coupon_id:
         coupon = db.query(Coupon).filter(Coupon.id == order.coupon_id).first()
@@ -126,8 +128,8 @@ def _recalculate(order: Order, db: Session) -> None:
         else:
             order.coupon_id = None  # coupon became invalid, detach
 
-    total_discount = product_discounts + promo_discount + coupon_discount
-    total = max(round(subtotal + tax_amount - total_discount, 2), 0.0)
+    total_discount = round(product_discounts + promo_discount + coupon_discount, 2)
+    total = round(max(subtotal + tax_amount - total_discount, 0.0), 2)
 
     order.subtotal = subtotal
     order.tax_amount = tax_amount
@@ -226,14 +228,49 @@ def get_by_id(order_id: int, db: Session) -> OrderResponse:
     return _to_response(_get_order(order_id, db))
 
 
+def _get_next_available_employee(db: Session) -> User:
+    """Find the employee with the fewest active orders (draft + sent_to_kitchen).
+    
+    Returns the least busy employee to balance workload across staff.
+    Active orders are those not yet paid (draft or sent_to_kitchen).
+    """
+    # Get all active employees (is_active=True) excluding admin
+    active_employees = db.query(User).filter(
+        User.is_active == True,
+        User.role != "admin",
+    ).all()
+    
+    if not active_employees:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active employees available",
+        )
+    
+    # Count active orders per employee (draft + sent_to_kitchen)
+    employee_workload = {}
+    for emp in active_employees:
+        active_count = db.query(Order).filter(
+            Order.employee_id == emp.id,
+            Order.status.in_([OrderStatus.draft, OrderStatus.sent_to_kitchen])
+        ).count()
+        employee_workload[emp.id] = (active_count, emp)
+    
+    # Assign to employee with least active orders
+    emp_id, (_, employee) = min(employee_workload.items(), key=lambda x: x[1][0])
+    return employee
+
+
 def create(payload: OrderCreate, current_user: User, db: Session) -> OrderResponse:
     session = _require_open_session(db)
+    # Assign to the least busy available employee (not current_user)
+    assigned_employee = _get_next_available_employee(db)
+    
     order = Order(
         order_number=_next_order_number(db),
         session_id=session.id,
         table_id=payload.table_id,
         customer_id=payload.customer_id,
-        employee_id=current_user.id,
+        employee_id=assigned_employee.id,
         note=payload.note,
         status=OrderStatus.draft,
         order_source=OrderSource.pos,
@@ -322,6 +359,7 @@ def add_item(order_id: int, payload: CartItemAdd, db: Session) -> OrderResponse:
         db.add(item)
 
     db.flush()
+    db.expire(order, ["items"])  # force SQLAlchemy to reload items from DB
     _recalculate(order, db)
     db.commit()
     return _to_response(_get_order(order_id, db))
@@ -344,6 +382,7 @@ def update_item(order_id: int, item_id: int, payload: CartItemUpdate, db: Sessio
     item.line_total = round(float(item.unit_price) * payload.quantity - line_discount, 2)
 
     db.flush()
+    db.expire(order, ["items"])
     _recalculate(order, db)
     db.commit()
     return _to_response(_get_order(order_id, db))
@@ -359,8 +398,7 @@ def remove_item(order_id: int, item_id: int, db: Session) -> OrderResponse:
 
     db.delete(item)
     db.flush()
-    # reload items after delete
-    db.refresh(order)
+    db.expire(order, ["items"])  # force reload after delete
     _recalculate(order, db)
     db.commit()
     return _to_response(_get_order(order_id, db))
@@ -381,6 +419,7 @@ def apply_coupon(order_id: int, payload: CouponApply, db: Session) -> OrderRespo
     coupon = coupon_service.redeem(payload.code, db)  # validates active, not expired, within limit
     order.coupon_id = coupon.id
     db.flush()
+    db.expire(order, ["items", "coupon"])
     _recalculate(order, db)
     db.commit()
     return _to_response(_get_order(order_id, db))
@@ -391,6 +430,7 @@ def remove_coupon(order_id: int, db: Session) -> OrderResponse:
     _require_draft(order)
     order.coupon_id = None
     db.flush()
+    db.expire(order, ["items", "coupon"])
     _recalculate(order, db)
     db.commit()
     return _to_response(_get_order(order_id, db))
@@ -455,6 +495,30 @@ def process_payment(order_id: int, payload: PaymentCreate, db: Session) -> Order
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot pay a cancelled order")
     if not order.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot pay an empty order")
+
+    db.expire(order, ["items"])
+    _recalculate(order, db)
+    db.flush()
+
+    # Auto-send to kitchen if employee forgot — fires only for draft orders with KDS items
+    if order.status == OrderStatus.draft:
+        db.expire(order, ["items", "kitchen_ticket"])
+        kds_items = [item for item in order.items if item.product.show_in_kds]
+        if kds_items:
+            db.expire(order, ["kitchen_ticket"])
+            if not order.kitchen_ticket:
+                ticket = KitchenTicket(
+                    order_id=order.id,
+                    stage=KitchenStage.to_cook,
+                )
+                db.add(ticket)
+                db.flush()
+                for item in kds_items:
+                    db.add(KitchenTicketItem(
+                        kitchen_ticket_id=ticket.id,
+                        order_item_id=item.id,
+                    ))
+            # Status will be overwritten to paid below — no need to set sent_to_kitchen
 
     method = db.query(PaymentMethod).filter(PaymentMethod.type == payload.payment_type).first()
     if not method or not method.is_enabled:
